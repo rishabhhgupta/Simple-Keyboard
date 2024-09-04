@@ -15,7 +15,11 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.Message
+import android.text.Editable
+import android.text.Html
+import android.text.TextWatcher
 import android.util.AttributeSet
+import android.util.Log
 import android.util.TypedValue
 import android.view.*
 import android.view.animation.AccelerateInterpolator
@@ -34,6 +38,7 @@ import androidx.emoji2.text.EmojiCompat.EMOJI_SUPPORTED
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.GridLayoutManager.SpanSizeLookup
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.rishabh.emojipicker.EmojiPickerView
 import com.simplemobiletools.commons.extensions.*
 import com.simplemobiletools.commons.helpers.ensureBackgroundThread
 import com.simplemobiletools.commons.helpers.isPiePlus
@@ -60,6 +65,7 @@ import com.simplemobiletools.keyboard.interfaces.RefreshClipsListener
 import com.simplemobiletools.keyboard.models.Clip
 import com.simplemobiletools.keyboard.models.ClipsSectionLabel
 import com.simplemobiletools.keyboard.models.ListItem
+import com.simplemobiletools.keyboard.services.SimpleKeyboardIME.Companion.searching
 import java.util.*
 
 @SuppressLint("UseCompatLoadingForDrawables", "ClickableViewAccessibility")
@@ -288,6 +294,7 @@ class MyKeyboardView @JvmOverloads constructor(context: Context, attrs: Attribut
         accessHelper = AccessHelper(this, mKeyboard?.mKeys.orEmpty())
         ViewCompat.setAccessibilityDelegate(this, accessHelper)
 
+
         // Not really necessary to do every time, but will free up views
         // Switching to a different keyboard should abort any pending keys so that the key up
         // doesn't get delivered to the old or new keyboard
@@ -297,7 +304,7 @@ class MyKeyboardView @JvmOverloads constructor(context: Context, attrs: Attribut
     /** Sets the top row above the keyboard containing a couple buttons and the clipboard **/
     fun setKeyboardHolder(binding: KeyboardViewKeyboardBinding) {
         keyboardViewBinding = binding.apply {
-            mToolbarHolder = toolbarHolder
+            mToolbarHolder = mainToolbarKeyboardHolder
             mClipboardManagerHolder = clipboardManagerHolder
             mEmojiPaletteHolder = emojiPaletteHolder
 
@@ -354,10 +361,7 @@ class MyKeyboardView @JvmOverloads constructor(context: Context, attrs: Attribut
                 }
             }
 
-            emojiPaletteClose.setOnClickListener {
-                vibrateIfNeeded()
-                closeEmojiPalette()
-            }
+
         }
     }
 
@@ -1439,10 +1443,19 @@ class MyKeyboardView @JvmOverloads constructor(context: Context, attrs: Attribut
 
     private fun setupEmojiPalette(toolbarColor: Int, backgroundColor: Int, textColor: Int) {
         keyboardViewBinding?.apply {
-            emojiPaletteTopBar.background = ColorDrawable(toolbarColor)
+            emojiSearchToolbar.background = ColorDrawable(toolbarColor)
             emojiPaletteHolder.background = ColorDrawable(backgroundColor)
             emojiPaletteClose.applyColorFilter(textColor)
-            emojiPaletteLabel.setTextColor(textColor)
+
+            emojiSearchView.setHintTextColor(mTextColor)
+            emojiSearchviewCross.applyColorFilter(textColor)
+            emojiSearchViewSearchIcon.applyColorFilter(textColor)
+            emojiSearchResult.background = ColorDrawable(backgroundColor)
+
+
+
+
+
 
             emojiPaletteBottomBar.background = ColorDrawable(backgroundColor)
             emojiPaletteModeChange.apply {
@@ -1481,37 +1494,106 @@ class MyKeyboardView @JvmOverloads constructor(context: Context, attrs: Attribut
                 }
             }
         }
-
-        setupEmojis()
     }
+
 
     fun openEmojiPalette() {
         keyboardViewBinding!!.emojiPaletteHolder.beVisible()
-        setupEmojis()
+        keyboardViewBinding!!.emojiSearchToolbar.beVisible()
+        keyboardViewBinding!!.mainToolbarKeyboardHolder.beGone()
+
+        /*when any emoji is picked from the emoji Picker*/
+        keyboardViewBinding!!.emojiPickerView.setOnEmojiPickedListener{
+            mOnKeyboardActionListener?.onText(it.emoji)
+
+
+        }
+
+        setupEmojiSearch()
     }
 
-    private fun closeEmojiPalette() {
+
+
+    private fun setupEmojiSearch(){
         keyboardViewBinding?.apply {
-            emojiPaletteHolder.beGone()
-            emojisList?.scrollToPosition(0)
+            emojiSearchView.setOnFocusChangeListener(object : View.OnFocusChangeListener{
+                override fun onFocusChange(v: View?, hasFocus: Boolean) {
+                    emojiPaletteHolder.beGone()
+                    mainToolbarKeyboardHolder.beGone()
+//                    emojiSearchView.text.clear()
+
+                    //change the input connection
+                    searching=true
+                    mOnKeyboardActionListener?.searchViewFocused(emojiSearchView)
+
+                    //show emoji result
+                    emojiSearchResult.beVisible()
+
+
+                    /*It's s interface it runn when someone picked ffrom the emoji search result suggestion*/
+                    val emojipickedFromSuggestion= object : EmojiPickerView.EmojiPickedFromSuggestion {
+                        override fun pickedEmoji(emoji: String) {
+                            searching =false
+                            mOnKeyboardActionListener?.onText(emoji)
+                            searching =true
+                        }
+                    }
+
+                    emojiSearchResult.emojiPickedFromSuggestion = (emojipickedFromSuggestion)
+
+
+                    /*when nothing is typed then in the showSearchResult show the recend only*/
+                    keyboardViewBinding?.apply {
+                        emojiSearchResult.bodyAdapter.hideTitleAndEmptyHint = true
+                        emojiSearchResult.emojiPickerItems = emojiSearchResult.buildEmojiPickerItems(onlyRecentEmojies = true)
+                        emojiSearchResult.bodyAdapter.notifyDataSetChanged()
+                    }
+
+                }
+            })
+
+
+
+            emojiPaletteClose.setOnClickListener {
+                vibrateIfNeeded()
+                closeEmojiPalette()
+            }
+
+            emojiSearchviewCross.setOnClickListener {
+                emojiSearchView.text.clear()
+            }
+
+            emojiSearchView.addTextChangedListener(object:TextWatcher{
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+
+                override fun afterTextChanged(s: Editable?) {
+                    emojiSearchResult.emojiPickerItems = emojiSearchResult.buildEmojiPickerItems(false,s.toString())
+                    emojiSearchResult.bodyAdapter.notifyDataSetChanged()
+                }
+
+            })
         }
     }
 
-    private fun setupEmojis() {
-        ensureBackgroundThread {
-            val fullEmojiList = parseRawEmojiSpecsFile(context, EMOJI_SPEC_FILE_PATH)
-            val systemFontPaint = Paint().apply {
-                typeface = Typeface.DEFAULT
+    private fun closeEmojiPalette() {
+
+        keyboardViewBinding?.apply {
+
+
+            if(emojiPaletteHolder.isVisible){
+                emojiPaletteHolder.beGone()
+                emojiSearchToolbar.beGone()
+                mainToolbarKeyboardHolder.beVisible()
+            }else{
+                emojiSearchView.clearFocus()
+                emojiSearchView.text.clear()
+                emojiPaletteHolder.beVisible()
             }
 
-            val emojis = fullEmojiList.filter { emoji ->
-                systemFontPaint.hasGlyph(emoji.emoji) || (EmojiCompat.get().loadState == EmojiCompat.LOAD_STATE_SUCCEEDED && EmojiCompat.get()
-                    .getEmojiMatch(emoji.emoji, emojiCompatMetadataVersion) == EMOJI_SUPPORTED)
-            }
-
-            Handler(Looper.getMainLooper()).post {
-                setupEmojiAdapter(emojis)
-            }
+            searching =false
+            keyboardViewBinding?.emojiSearchResult?.beGone()
         }
     }
 
@@ -1522,83 +1604,7 @@ class MyKeyboardView @JvmOverloads constructor(context: Context, attrs: Attribut
         }
     }
 
-    private fun setupEmojiAdapter(emojis: List<EmojiData>) {
-        val categories = emojis.groupBy { it.category }
-        val allItems = mutableListOf<EmojisAdapter.Item>()
-        categories.entries.forEach { (category, emojis) ->
-            allItems.add(EmojisAdapter.Item.Category(category))
-            allItems.addAll(emojis.map(EmojisAdapter.Item::Emoji))
-        }
-        val checkIds = mutableMapOf<Int, String>()
-        keyboardViewBinding?.emojiCategoriesStrip?.apply {
-            weightSum = categories.count().toFloat()
-            val strip = this
-            removeAllViews()
-            categories.entries.forEach { (category, emojis) ->
-                ItemEmojiCategoryBinding.inflate(LayoutInflater.from(context), this, true).apply {
-                    root.id = generateViewId()
-                    checkIds[root.id] = category
-                    root.setImageResource(emojis.first().getCategoryIcon())
-                    root.layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        1f
-                    )
-                    root.setOnClickListener {
-                        strip.children.filterIsInstance<ImageButton>().forEach {
-                            it.imageTintList = ColorStateList.valueOf(mTextColor)
-                        }
-                        root.imageTintList = ColorStateList.valueOf(context.getProperPrimaryColor())
-                        keyboardViewBinding?.emojisList?.stopScroll()
-                        (keyboardViewBinding?.emojisList?.layoutManager as? GridLayoutManager)?.scrollToPositionWithOffset(
-                            allItems.indexOfFirst { it is EmojisAdapter.Item.Category && it.value == category },
-                            0
-                        )
-                    }
-                    root.imageTintList = ColorStateList.valueOf(mTextColor)
-                }
-            }
-        }
-        keyboardViewBinding?.emojisList?.apply {
-            val emojiItemWidth = context.resources.getDimensionPixelSize(R.dimen.emoji_item_size)
-            val emojiTopBarElevation = context.resources.getDimensionPixelSize(R.dimen.emoji_top_bar_elevation).toFloat()
 
-            layoutManager = AutoGridLayoutManager(context, emojiItemWidth).apply {
-                spanSizeLookup = object : SpanSizeLookup() {
-                    override fun getSpanSize(position: Int): Int =
-                        if (allItems[position] is EmojisAdapter.Item.Category) {
-                            spanCount
-                        } else {
-                            1
-                        }
-                }
-            }
-            adapter = EmojisAdapter(context = context, items = allItems) { emoji ->
-                mOnKeyboardActionListener!!.onText(emoji.emoji)
-                vibrateIfNeeded()
-            }
-
-            clearOnScrollListeners()
-            onScroll {
-                keyboardViewBinding!!.emojiPaletteTopBar.elevation = if (it > 4) emojiTopBarElevation else 0f
-                (keyboardViewBinding?.emojisList?.layoutManager as? LinearLayoutManager)?.findFirstCompletelyVisibleItemPosition()?.also { firstVisibleIndex ->
-                    allItems
-                        .withIndex()
-                        .lastOrNull { it.value is EmojisAdapter.Item.Category && it.index <= firstVisibleIndex }
-                        ?.also { activeCategory ->
-                            val id = checkIds.entries.first { it.value == (activeCategory.value as EmojisAdapter.Item.Category).value }.key
-                            keyboardViewBinding?.emojiCategoriesStrip?.children?.filterIsInstance<ImageButton>()?.forEach {
-                                if (it.id == id) {
-                                    it.imageTintList = ColorStateList.valueOf(context.getProperPrimaryColor())
-                                } else {
-                                    it.imageTintList = ColorStateList.valueOf(mTextColor)
-                                }
-                            }
-                        }
-                }
-            }
-        }
-    }
 
     private fun closing() {
         if (mPreviewPopup.isShowing) {

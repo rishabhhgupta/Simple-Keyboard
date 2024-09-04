@@ -1,5 +1,5 @@
 <com.simplemobiletools.commons.views.MyRecyclerView
-    android:id="@+id/emojis_list"
+    android:id="@+id/emojiPickerView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:clipToPadding="false"

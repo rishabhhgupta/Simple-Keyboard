@@ -41,4 +41,9 @@ interface OnKeyboardActionListener {
      * Called to force the KeyboardView to reload the keyboard
      */
     fun reloadKeyboard()
+
+    /*
+   * called when  focus on the searchview */
+    fun searchViewFocused(searchView: androidx.appcompat.widget.AppCompatAutoCompleteTextView)
+
 }

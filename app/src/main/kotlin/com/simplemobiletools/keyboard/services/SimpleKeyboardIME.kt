@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Bundle
 import android.text.InputType.*
 import android.text.TextUtils
+import android.util.Log
 import android.util.Size
 import android.view.KeyEvent
 import android.view.View
@@ -23,6 +24,8 @@ import android.view.inputmethod.EditorInfo.IME_FLAG_NO_ENTER_ACTION
 import android.view.inputmethod.EditorInfo.IME_MASK_ACTION
 import android.widget.inline.InlinePresentationSpec
 import androidx.annotation.RequiresApi
+import androidx.appcompat.widget.AppCompatAutoCompleteTextView
+import androidx.appcompat.widget.SearchView
 import androidx.autofill.inline.UiVersions
 import androidx.autofill.inline.common.ImageViewStyle
 import androidx.autofill.inline.common.TextViewStyle
@@ -60,8 +63,16 @@ class SimpleKeyboardIME : InputMethodService(), OnKeyboardActionListener, Shared
     private var enterKeyType = IME_ACTION_NONE
     private var switchToLetters = false
     private var breakIterator: BreakIterator? = null
+    private var otherInputConnection:OtherInputConnection? = null
 
     private lateinit var binding: KeyboardViewKeyboardBinding
+
+    companion object{
+        /*true and false define the inputconnection where is input is send like
+        *  if true-> send to emoji searchview
+        * if false -> send to currentinputconnection*/
+        var searching=false
+    }
 
     override fun onInitializeInterface() {
         super.onInitializeInterface()
@@ -106,7 +117,7 @@ class SimpleKeyboardIME : InputMethodService(), OnKeyboardActionListener, Shared
 
         val editorInfo = currentInputEditorInfo
         if (config.enableSentencesCapitalization && editorInfo != null && editorInfo.inputType != TYPE_NULL) {
-            if (currentInputConnection.getCursorCapsMode(editorInfo.inputType) != 0) {
+            if (currentInputConnection.getCursorCapsMode(editorInfo.inputType) != 0 && !searching) {
                 keyboard?.setShifted(ShiftState.ON_ONE_CHAR)
                 keyboardView?.invalidateAllKeys()
                 return
@@ -149,7 +160,7 @@ class SimpleKeyboardIME : InputMethodService(), OnKeyboardActionListener, Shared
     }
 
     override fun onKey(code: Int) {
-        val inputConnection = currentInputConnection
+        val inputConnection = getMyCurrentInputConnection()
         if (keyboard == null || inputConnection == null) {
             return
         }
@@ -216,7 +227,10 @@ class SimpleKeyboardIME : InputMethodService(), OnKeyboardActionListener, Shared
             }
 
             MyKeyboard.KEYCODE_EMOJI -> {
-                keyboardView?.openEmojiPalette()
+                if(!searching){
+                    keyboardView?.openEmojiPalette()
+                }
+
             }
 
             else -> {
@@ -324,13 +338,18 @@ class SimpleKeyboardIME : InputMethodService(), OnKeyboardActionListener, Shared
     }
 
     override fun onText(text: String) {
-        currentInputConnection?.commitText(text, 1)
+        getMyCurrentInputConnection().commitText(text, 1)
+
     }
 
     override fun reloadKeyboard() {
         val keyboard = createNewKeyboard()
         this.keyboard = keyboard
         keyboardView?.setKeyboard(keyboard)
+    }
+
+    override fun searchViewFocused(searchView: AppCompatAutoCompleteTextView) {
+        otherInputConnection = OtherInputConnection(searchView)
     }
 
     private fun createNewKeyboard(): MyKeyboard {
@@ -484,5 +503,21 @@ class SimpleKeyboardIME : InputMethodService(), OnKeyboardActionListener, Shared
         this.recycle()
 
         return Icon.createWithData(byteArray, 0, byteArray.size)
+    }
+
+    fun getMyCurrentInputConnection():InputConnection{
+        if (searching){
+            if(otherInputConnection==null){
+                Log.i("thisISrunn", "yes2")
+                return currentInputConnection
+            }else{
+                Log.i("thisISrunn", "yes")
+                return otherInputConnection!!
+            }
+
+        }else{
+            Log.i("thisISrunn", "yes3")
+            return currentInputConnection
+        }
     }
 }
