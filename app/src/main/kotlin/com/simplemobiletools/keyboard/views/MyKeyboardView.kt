@@ -264,7 +264,7 @@ class MyKeyboardView @JvmOverloads constructor(context: Context, attrs: Attribut
         super.onVisibilityChanged(changedView, visibility)
         closeClipboardManager()
         closeEmojiPalette()
-
+        keyboardViewBinding?.emojiPaletteHolder?.beGone()
         if (visibility == VISIBLE) {
             setupKeyboard(changedView)
         }
@@ -280,6 +280,7 @@ class MyKeyboardView @JvmOverloads constructor(context: Context, attrs: Attribut
         }
 
         keyboardViewBinding?.emojiPaletteHolder?.beGone()
+
         closeClipboardManager()
         removeMessages()
         mKeyboard = keyboard
