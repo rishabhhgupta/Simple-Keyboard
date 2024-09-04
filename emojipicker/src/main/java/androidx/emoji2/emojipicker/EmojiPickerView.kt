@@ -167,7 +167,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 
     /*here is emoji is get from the bundle and send to recycler view*/
      fun buildEmojiPickerItems(onlyRecentEmojies: Boolean = false, description: String?=null ) :EmojiPickerItems{
-
+        //used in search result usualy assign in the xml file when created a emojiPicker view
         if(!usedInSearchResult){
             return EmojiPickerItems(
                 buildList {

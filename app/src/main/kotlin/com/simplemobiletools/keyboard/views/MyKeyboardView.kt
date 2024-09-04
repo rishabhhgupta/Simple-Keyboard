@@ -279,6 +279,7 @@ class MyKeyboardView @JvmOverloads constructor(context: Context, attrs: Attribut
             showPreview(NOT_A_KEY)
         }
 
+        keyboardViewBinding?.emojiPaletteHolder?.beGone()
         closeClipboardManager()
         removeMessages()
         mKeyboard = keyboard
@@ -1583,10 +1584,12 @@ class MyKeyboardView @JvmOverloads constructor(context: Context, attrs: Attribut
 
 
             if(emojiPaletteHolder.isVisible){
+                Log.i("thisISsRUNN","YESS")
                 emojiPaletteHolder.beGone()
                 emojiSearchToolbar.beGone()
                 mainToolbarKeyboardHolder.beVisible()
             }else{
+                Log.i("thisISsRUNN","YESS2")
                 emojiSearchView.clearFocus()
                 emojiSearchView.text.clear()
                 emojiPaletteHolder.beVisible()
